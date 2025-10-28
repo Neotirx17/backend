@@ -26,13 +26,25 @@ def summary(session: Session = Depends(get_session), user = Depends(require_role
     next_30 = date.fromordinal(today.toordinal() + 30)
     upcoming = sum(float(l.amount or 0) for l in loans if l.due_date and today <= l.due_date <= next_30)
 
-    # Evolução mensal (simplificada): soma do valor dos empréstimos por mês do ano corrente
-    monthly = {}
+    # Evolução mensal: soma por mês (Jan-Dez) de empréstimos e pagamentos (ano corrente)
+    months_keys = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+    loans_monthly = {k: 0.0 for k in months_keys}
+    pays_monthly = {k: 0.0 for k in months_keys}
+    current_year = today.year
     for l in loans:
-        if l.date:
-            key = l.date.strftime("%b")  # Jan, Fev, ... (em inglês por padrão)
-            monthly[key] = monthly.get(key, 0) + float(l.amount or 0)
-    monthly_evolution = [{"month": m, "value": v} for m, v in monthly.items()]
+        if l.date and l.date.year == current_year:
+            key = l.date.strftime("%b")
+            if key in loans_monthly:
+                loans_monthly[key] += float(l.amount or 0)
+    for p in payments:
+        if p.date and p.date.year == current_year:
+            key = p.date.strftime("%b")
+            if key in pays_monthly:
+                pays_monthly[key] += float(p.amount or 0)
+    monthly_evolution = [
+        {"month": m, "loans": loans_monthly[m], "payments": pays_monthly[m]}
+        for m in months_keys
+    ]
 
     alerts = []
     for l in loans:
